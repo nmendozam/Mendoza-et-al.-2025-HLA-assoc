@@ -77,7 +77,7 @@ byprot_with_pcs$sex[grep('_m_', row.names(byprot_with_pcs))] <- 0
 
 # Run the association
 logit <- glm(LLI ~ ., data = byprot_with_pcs, family = binomial) 
-# This is ran to get the model evaluation metrics, however the statistics
+# This was ran to get the model evaluation metrics, however the statistics
 # are taken from the robust model below
 
 # Evaluate the model
