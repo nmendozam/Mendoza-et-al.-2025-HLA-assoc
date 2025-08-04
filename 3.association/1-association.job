@@ -1,0 +1,80 @@
+#!/bin/bash
+##SBATCH --partition WORK
+#SBATCH --mem 64G
+#SBATCH -c 5
+#SBATCH -t 4-00:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=mendozamejian@gmail.com
+
+
+# inputs
+input_vcf=input/IMPUTED.GSAdata.clean.bgl.phased.vcf
+input_fam=input/GSAdata_raw.clean.fam
+
+# tmp files
+mkdir -p tmp
+phe_file=tmp/GSAdata_raw.clean.phe
+covar=tmp/Ageing.covar
+converted_vcf=tmp/HLA.vcf
+pyhla=tmp/Ageing.pyhla
+pyhla2field=tmp/Ageing.2field.pyhla
+pyhla3field=tmp/Ageing.3field.pyhla
+pyhla2field_100=tmp/Ageing.2field.100.pyhla
+pyhla3field_100=tmp/Ageing.3field.100.pyhla
+
+# out files
+mkdir -p output
+
+
+
+set -e
+module add miniconda3
+
+# run conversion
+conda activate base
+python3 fam2phe.py $input_fam $phe_file
+# grep "#CHR" $input_vcf > $converted_vcf
+# grep "HLA_" $input_vcf >> $converted_vcf
+bcftools view --include 'AR2>0.8 && AF<0.01 && ID~"HLA"' $input_vcf -o tmp/filtered.vcf
+grep -v "##" tmp/filtered.vcf > $converted_vcf
+altools convert vcf2allele $converted_vcf --phe $phe_file --output $pyhla
+
+# Filter resolutions
+sed -E 's/[A-Z0-9]+\*[0-9]+N?([^:0-9]|$)/NA\t/g' $pyhla > $pyhla2field
+sed -E 's/[A-Z0-9]+\*[0-9]+:[0-9]+N?([^:0-9]|$)/NA\t/g' $pyhla2field > $pyhla3field
+
+# Generate centenarians
+grep -v 'AGI95' $pyhla2field > $pyhla2field_100
+grep -v 'AGI95' $pyhla3field > $pyhla3field_100
+
+
+# run association
+conda activate py_hla
+
+#####################################
+# Association of the whole population
+#####################################
+
+# Run covar assoaciation
+python PyHLA/PyHLA.py --input $pyhla3field -d 6 --assoc --test logistic --covar input/covar_pyhla_qc.txt --model additive --covar-name V3,V4,V5 --out output/3field.assoc
+# Get summary of frequencies
+python PyHLA/PyHLA.py --input $pyhla2field -d 4 --summary --out output/2field.summary
+python PyHLA/PyHLA.py --input $pyhla3field -d 6 --summary --out output/3field.summary
+# Test for allele zigosity and interactions
+python PyHLA/PyHLA.py --input $pyhla3field -d 6 --zygosity --level allele --out output/3field.allele.zigosity
+python PyHLA/PyHLA.py --input $pyhla3field -d 6 --interaction --level allele --out output/3field.allele.interaction
+
+#########################
+# Sex-stratified analysis
+#########################
+
+grep -v _f_ "tmp/$pyhla3field" > "tmp/male.$pyhla3field"
+grep -v _m_ "tmp/$pyhla3field" > "tmp/female.$pyhla3field"
+
+fields=$(echo tmp/$pyhla3field | grep -o "[0-9]field" | sed "s/field//")
+fields=$(($fields+$fields))
+
+python PyHLA/PyHLA.py --input "tmp/male.$pyhla3field" -d $fields --assoc --test logistic --covar input/covar_pyhla_qc.txt --model additive --covar-name V3,V4,V5 --out output/male.$pyhla3field.assoc
+python PyHLA/PyHLA.py --input "tmp/female.$pyhla3field" -d $fields --assoc --test logistic --covar input/covar_pyhla_qc.txt --model additive --covar-name V3,V4,V5 --out output/female.$pyhla3field.assoc
+python PyHLA/PyHLA.py --input "tmp/male.$pyhla3field" -d $fields --summary --out output/male.$pyhla3field.summary
+python PyHLA/PyHLA.py --input "tmp/female.$pyhla3field" -d $fields --summary --out output/female.$pyhla3field.summary

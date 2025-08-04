@@ -1,0 +1,14 @@
+# Ignore data files
+output*
+input*
+tmp/
+results
+rawdata
+
+# Ignore vscode settings
+.vscode
+
+# Ignore slurm output files
+slurm*
+
+.Rhistory

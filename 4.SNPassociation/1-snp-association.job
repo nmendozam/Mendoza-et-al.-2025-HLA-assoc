@@ -1,0 +1,24 @@
+#!/bin/bash
+##SBATCH --partition WORK
+#SBATCH --mem 64G
+#SBATCH -c 5
+#SBATCH -t 01:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=mendozamejian@gmail.com
+
+module add plink
+
+# inputs
+input=input/GSAdata_raw.clean
+input_phe=input/GSAdata_raw.clean.phe
+
+mkdir tmp
+mkdir output
+
+plink \
+    --bfile $input \
+    --assoc \
+    --out output/assoc \
+    --covar $input_phe \
+    --covar-name V3,V4,V5 \
+    --snp rs9267649

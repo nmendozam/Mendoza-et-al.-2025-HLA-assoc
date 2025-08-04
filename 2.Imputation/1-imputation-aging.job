@@ -1,0 +1,13 @@
+#!/bin/bash
+##SBATCH --partition WORK
+#SBATCH --mem 64G
+#SBATCH -c 5
+#SBATCH -t 4-00:00:00
+
+module add miniconda3
+source 0-env.sh
+mkdir output
+
+cd HLA-TAPAS/
+python -m SNP2HLA --target ../input/GSAdata_raw.clean --out ../output/IMPUTED.GSAdata.clean --reference resources/1000G.bglv4 --nthreads 5 --mem 64g
+
